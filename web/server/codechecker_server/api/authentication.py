@@ -190,7 +190,12 @@ class ThriftAuthHandler:
             user_name, _ = auth_string.split(':', 1)
             LOG.debug("'%s' logging in...", user_name)
 
-            session = self.__manager.create_session(auth_string)
+            try:
+                session = self.__manager.create_session(auth_string)
+            except Exception as ex:
+                raise codechecker_api_shared.ttypes.RequestFailed(
+                    codechecker_api_shared.ttypes.ErrorCode.AUTH_DENIED,
+                    str(ex))
 
             if session:
                 LOG.info("'%s' logged in.", user_name)
@@ -207,6 +212,7 @@ class ThriftAuthHandler:
         elif auth_method.startswith("oauth_", 0, 6):
             provider = auth_method[6:]
             oauth_config = self.__manager.get_oauth_config(provider)
+            allowed_groups = self.__manager.get_allowed_groups()
             if not oauth_config.get("enabled"):
                 raise codechecker_api_shared.ttypes.RequestFailed(
                     codechecker_api_shared.ttypes.ErrorCode.AUTH_DENIED,
@@ -219,6 +225,7 @@ class ThriftAuthHandler:
             user_info_url = oauth_config["oauth_user_info_uri"]
             redirect_uri = oauth_config["oauth_redirect_uri"]
             allowed_users = oauth_config.get("allowed_users", [])
+            default_groups = oauth_config.get("default_groups", [])
 
             session = OAuth2Session(
                 client_id,
@@ -230,6 +237,7 @@ class ThriftAuthHandler:
                 authorization_response=auth_string)
 
             user_info = session.get(user_info_url).json()
+            
             username = user_info[
                 oauth_config["oauth_user_info_mapping"]["username"]]
 
@@ -242,9 +250,15 @@ class ThriftAuthHandler:
                         break
 
             if allowed_users == ["*"] or username in allowed_users:
-                session = self.__manager.create_session(
-                    provider + "@" + username +
-                    ":" + token['access_token'])
+                try:
+                    session = self.__manager.create_session(
+                        provider + "@" + username +
+                        ":" + token['access_token'])
+                except Exception as ex:
+                    raise codechecker_api_shared.ttypes.RequestFailed(
+                        codechecker_api_shared.ttypes.ErrorCode.AUTH_DENIED,
+                        str(ex))
+
                 return session.token
 
             if len(allowed_users) == 0:

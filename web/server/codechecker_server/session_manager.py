@@ -272,6 +272,9 @@ class SessionManager:
     def get_oauth_config(self, provider):
         return self.__auth_config.get(
             'method_oauth', {}).get("providers", {}).get(provider, {})
+    
+    def get_allowed_groups(self):
+        return self.__auth_config.get('allowed_groups', [])
 
     def __get_config_dict(self):
         """
@@ -523,9 +526,10 @@ class SessionManager:
             if not providers[provider].get('enabled', False):
                 return False
 
+            groups = providers[provider].get('default_groups', [])
             data = auth_string.split(provider + '@')[1]
             username, token = data.split(':')
-            return {'username': username, 'token': token, 'groups': []}
+            return {'username': username, 'token': token, 'groups': groups}
 
         return False
 
@@ -668,6 +672,17 @@ class SessionManager:
         user_name = validation.get('username')
         groups = validation.get('groups', [])
         is_root = validation.get('root', False)
+
+        # Check if the user is in the allowed groups.
+        is_in_group = False
+        for group in self.get_allowed_groups():
+            if group in groups:
+                is_in_group = True
+                break
+        print("******", groups)
+
+        if not is_in_group and not is_root:
+            raise Exception("User is not in the allowed groups.")
 
         local_session = self.__create_local_session(token, user_name,
                                                     groups, is_root)
