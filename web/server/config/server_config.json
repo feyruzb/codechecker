@@ -72,12 +72,7 @@
           "scope": "openid email profile",
           "user_info_mapping": {
             "username": "login"
-          },
-          "allowed_users": [
-            "user1",
-            "user2",
-            "user3"
-          ]
+          }
         },
         "google": {
           "enabled" : false,
@@ -90,12 +85,7 @@
           "scope" : "openid email profile",
           "user_info_mapping" : {
             "username" : "email"
-          },
-          "allowed_users": [
-            "user1@gmail.com",
-            "user2@gmail.com",
-            "user3@gmail.com"
-          ]
+          }
         },
         "microsoft": {
           "enabled": false,
@@ -109,11 +99,6 @@
           "user_info_mapping": {
             "username": "mail"
           },
-          "allowed_users": [
-            "user1@gmail.com",
-            "user2@gmail.com",
-            "user3@gmail.com"
-          ],
           "default_groups": [
             "users_microsoft"
           ]
