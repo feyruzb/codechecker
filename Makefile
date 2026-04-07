@@ -6,6 +6,7 @@ PYTHON_BIN ?= python3
 
 API_VERSION := $(shell python3 -c "exec(open('$(CURRENT_DIR)/web/codechecker_web/shared/version.py').read()); print(f'{max(SUPPORTED_VERSIONS)}.{SUPPORTED_VERSIONS[max(SUPPORTED_VERSIONS)]}.0')")
 VENV_API_VERSION := $(shell pip show codechecker-api 2>/dev/null | grep "^Version:" | cut -d' ' -f2)
+PACKAGE_JSON_VERSION := $(shell python3 -c "exec(open('$(CURRENT_DIR)/web/api/js/codechecker-api-node/package.json').read()); print(__import__('json').loads(open('$(CURRENT_DIR)/web/api/js/codechecker-api-node/package.json').read())['version'])")
 
 CC_BUILD_DIR = $(BUILD_DIR)/CodeChecker
 CC_BUILD_BIN_DIR = $(CC_BUILD_DIR)/bin
@@ -250,8 +251,8 @@ set_git_commit_template:
 	if [ -d "$(CURRENT_DIR)/.git" ]; then git config --local commit.template .gitmessage; fi
 
 check_api_version:
-	@if [ "$(API_VERSION)" != "$(VENV_API_VERSION)" ]; then \
-		echo "ERROR: API version mismatch! Source: $(API_VERSION), venv: $(VENV_API_VERSION)"; \
+	@if [ "$(API_VERSION)" != "$(VENV_API_VERSION)" ] || [ "$(API_VERSION)" != "$(PACKAGE_JSON_VERSION)" ]; then \
+		echo "ERROR: API version mismatch! Source: $(API_VERSION), venv: $(VENV_API_VERSION), package.json: $(PACKAGE_JSON_VERSION)"; \
 		echo "Please run './scripts/thrift/completly-rebuild-thrift.sh <venv|venv_dev>' to rebuild the Thrift API."; \
 		exit 1; \
 	else \

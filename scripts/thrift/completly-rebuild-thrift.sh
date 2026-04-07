@@ -46,9 +46,6 @@ make "clean_${ENV_TYPE}"
 echo "Creating new virtual environment ($ENV_TYPE)..."
 make "$ENV_TYPE"
 
-echo "Building package..."
-make package
-
 # Again just in case
 echo "Activating virtual environment and setting PATH..."
 source "$REPO_ROOT/${ENV_TYPE}/bin/activate"
