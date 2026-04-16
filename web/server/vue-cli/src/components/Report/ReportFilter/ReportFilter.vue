@@ -642,7 +642,8 @@ export default {
       // back into URL query, where component fetches it from.
       const presetReportFilter = structuredClone(this.reportFilter);
       const runFilter = this.$refs.filters.find(f => f.id === "run");
-      presetReportFilter.runName = runFilter?.selectedItems.map(i => i.id) ?? [];
+      presetReportFilter.runName =
+        runFilter?.selectedItems.map(i => i.id) ?? [];
 
       const activePresetId = this.$refs.FilterMenu?.[0]?.activePresetId;
 
