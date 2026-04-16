@@ -635,6 +635,15 @@ export default {
     },
 
     saveCurrentFilter(mode) {
+
+      // this.reportFilter.runName is left empty during normal UI interaction,
+      // as it is a deprecated field. At save time, the `runName` is manually
+      // inserted into a clone of `reportFilter`. On component load, it's put
+      // back into URL query, where component fetches it from.
+      const reportFilter = structuredClone(this.reportFilter);
+      const runFilter = this.$refs.filters.find(f => f.id === "run");
+      reportFilter.runName = runFilter?.selectedItems.map(i => i.id) ?? [];
+
       const activePresetId = this.$refs.FilterMenu?.[0]?.activePresetId;
 
       const preset = {
@@ -642,7 +651,7 @@ export default {
           ? activePresetId
           : -1,
         name: this.presetName,
-        reportFilter: this.reportFilter
+        reportFilter: reportFilter
       };
 
       new Promise(resolve => {
@@ -660,6 +669,7 @@ export default {
           handleThriftError("FAILURE", err);
         });
     },
+
     deletePreset(preset_id) {
       new Promise(resolve => {
         ccService.getClient().deleteFilterPreset(preset_id,
