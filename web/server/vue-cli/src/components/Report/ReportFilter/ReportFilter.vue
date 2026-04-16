@@ -640,9 +640,9 @@ export default {
       // as it is a deprecated field. At save time, the `runName` is manually
       // inserted into a clone of `reportFilter`. On component load, it's put
       // back into URL query, where component fetches it from.
-      const reportFilter = structuredClone(this.reportFilter);
+      const presetReportFilter = structuredClone(this.reportFilter);
       const runFilter = this.$refs.filters.find(f => f.id === "run");
-      reportFilter.runName = runFilter?.selectedItems.map(i => i.id) ?? [];
+      presetReportFilter.runName = runFilter?.selectedItems.map(i => i.id) ?? [];
 
       const activePresetId = this.$refs.FilterMenu?.[0]?.activePresetId;
 
@@ -651,7 +651,7 @@ export default {
           ? activePresetId
           : -1,
         name: this.presetName,
-        reportFilter: reportFilter
+        reportFilter: presetReportFilter
       };
 
       new Promise(resolve => {
