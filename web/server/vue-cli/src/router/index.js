@@ -132,6 +132,11 @@ const router = createRouter({
       ]
     },
     {
+      path: "/ai-fix-demo",
+      name: "ai-fix-demo",
+      component: () => import("@/views/AiFixDemo")
+    },
+    {
       path: "/:unknown(.*)*",
       redirect: "/404"
     }

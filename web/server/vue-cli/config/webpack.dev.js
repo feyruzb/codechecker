@@ -2,6 +2,7 @@ const { DefinePlugin } = require('webpack');
 const { merge } = require('webpack-merge');
 
 const common = require('./webpack.common.js');
+const aiFix = require("./ai-fix-middleware");
 
 const CC_SERVICE_ENDPOINTS = [
   'Authentication',
@@ -53,7 +54,11 @@ module.exports = merge(common, {
       target: CC_THRIFT_API_HOST + ':' + CC_THRIFT_API_PORT,
       changeOrigin: true,
       secure: false
-    }]
+    }],
+    setupMiddlewares: (middlewares, devServer) => {
+      aiFix(devServer.app);
+      return middlewares;
+    }
   },
   plugins: [
     new DefinePlugin({

@@ -9,8 +9,14 @@
     >
       <v-col
         class="py-0"
-        :cols="editorCols"
+        :cols="showComments ? 12 - commentCols : 12"
+        style="min-width:0"
       >
+        <splitpanes
+          class="default-theme report-splitpanes"
+          :class="{ 'no-split': !showAiPanel }"
+        >
+          <pane :size="showAiPanel ? 55 : 100" min-size="30">
         <v-container
           fluid
           class="pa-0 mb-2"
@@ -263,6 +269,130 @@
             </v-col>
           </v-row>
         </v-container>
+          </pane>
+          <pane v-if="showAiPanel" :size="45" min-size="20">
+            <v-card
+              class="ai-fix-panel"
+              variant="outlined"
+              height="100%"
+            >
+              <v-card-title
+                class="d-flex align-center py-2 px-3"
+              >
+                <v-icon
+                  size="small"
+                  color="primary"
+                  class="mr-1"
+                >
+                  mdi-auto-fix
+                </v-icon>
+                <span class="text-body-2 font-weight-medium">
+                  AI Fix Suggestion
+                </span>
+                <v-chip
+                  size="x-small"
+                  color="primary"
+                  variant="tonal"
+                  class="ml-2"
+                >
+                  Amazon Q
+                </v-chip>
+                <v-spacer />
+                <v-btn
+                  icon
+                  size="x-small"
+                  variant="text"
+                  @click="closeAiPanel"
+                >
+                  <v-icon size="small">mdi-close</v-icon>
+                </v-btn>
+              </v-card-title>
+              <v-divider />
+              <v-card-text
+                class="ai-fix-content pa-0"
+                style="overflow:auto;height:calc(100% - 48px)"
+              >
+                <div
+                  v-if="aiFixState === 'loading'"
+                  class="d-flex flex-column align-center justify-center"
+                  style="min-height:300px"
+                >
+                  <v-progress-circular
+                    indeterminate
+                    color="primary"
+                    size="40"
+                  />
+                  <div class="text-body-2 mt-3">
+                    Analyzing with Amazon Q…
+                  </div>
+                  <div class="text-caption text-grey mt-1">
+                    {{ aiFixMessage }}
+                  </div>
+                </div>
+                <template v-if="aiFixState === 'ready'">
+                  <v-expansion-panels
+                    v-if="aiExplanation"
+                    class="ai-explanation-panels"
+                  >
+                    <v-expansion-panel>
+                      <v-expansion-panel-title>
+                        <v-icon
+                          size="small"
+                          color="amber-darken-2"
+                          class="mr-2"
+                        >
+                          mdi-lightbulb-outline
+                        </v-icon>
+                        <span class="font-weight-medium">
+                          Explanation
+                        </span>
+                      </v-expansion-panel-title>
+                      <v-expansion-panel-text>
+                        <div class="text-body-2">
+                          {{ aiExplanation }}
+                        </div>
+                      </v-expansion-panel-text>
+                    </v-expansion-panel>
+                  </v-expansion-panels>
+                  <div
+                    v-if="aiDiffLines.length"
+                    style="overflow:auto;flex:1"
+                  >
+                    <table class="ai-diff-table">
+                      <tbody>
+                        <tr
+                          v-for="(line, i) in aiDiffLines"
+                          :key="i"
+                          :class="diffLineClass(line)"
+                        >
+                          <td class="diff-ln">
+                            {{ line.type !== 'add'
+                              ? line.oldNum : '' }}
+                          </td>
+                          <td class="diff-ln">
+                            {{ line.type !== 'remove'
+                              ? line.newNum : '' }}
+                          </td>
+                          <td class="diff-marker">
+                            {{ diffMarker(line) }}
+                          </td>
+                          <td class="line-code">
+                            {{ line.text }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <pre
+                    v-else-if="aiFixResult"
+                    class="ai-fix-result pa-3"
+                    style="white-space:pre-wrap;font-size:13px"
+                  >{{ aiFixResult }}</pre>
+                </template>
+              </v-card-text>
+            </v-card>
+          </pane>
+        </splitpanes>
       </v-col>
       <v-col
         v-if="showComments"
@@ -313,6 +443,9 @@ import { jsPlumb } from "jsplumb";
 import { useDateUtils } from "@/composables/useDateUtils";
 import { format } from "date-fns";
 
+import { Pane, Splitpanes } from "splitpanes";
+import "splitpanes/dist/splitpanes.css";
+
 import { ccService, handleThriftError } from "@cc-api";
 import {
   Checker,
@@ -334,6 +467,8 @@ import ToggleBlameViewBtn from "./Git/ToggleBlameViewBtn";
 import { ShowReportInfoDialog } from "./ReportInfo";
 import SelectReviewStatus from "./SelectReviewStatus";
 import SelectSameReport from "./SelectSameReport";
+
+import { mergeWithSource, parseAiDiff } from "./AiFix/parseDiff";
 
 import ReportStepMessage from "./ReportStepMessage";
 
@@ -362,6 +497,12 @@ const numOfComments = ref(0);
 const loadNumOfComments = ref(false);
 const showComments = ref(false);
 const commentCols = ref(3);
+const showAiPanel = ref(false);
+const aiFixState = ref("idle");
+const aiFixResult = ref("");
+const aiFixMessage = ref("");
+const aiDiffLines = ref([]);
+const aiExplanation = ref("");
 const loading = ref(true);
 const bus = mitt();
 const selectedChecker = ref(null);
@@ -441,10 +582,6 @@ const lineWidgetField = context => {
 
 const trackingBranch = computed(() => sourceFile.value?.trackingBranch);
 const hasBlameInfo = computed(() => sourceFile.value?.hasBlameInfo);
-const editorCols = computed(() => {
-  const maxCols = 12;
-  return showComments.value ? maxCols - commentCols.value : maxCols;
-});
 const reviewData = computed(() =>
   report.value?.reviewData || new ReviewData()
 );
@@ -572,6 +709,14 @@ onMounted(() => {
       analyzerName: report.value.analyzerName,
       checkerId: report.value.checkerId
     });
+  });
+
+  bus.on("requestAiFix", data => {
+    showAiPanel.value = true;
+    aiFixState.value = "loading";
+    aiFixMessage.value = data.message;
+    aiFixResult.value = "";
+    fetchAiFix(data);
   });
 });
 
@@ -1014,9 +1159,75 @@ function truncate(text, length) {
   if (text.length <= length) return text;
   return text.substring(0, length) + "...";
 }
+
+function closeAiPanel() {
+  showAiPanel.value = false;
+  aiFixState.value = "idle";
+  aiFixResult.value = "";
+  aiDiffLines.value = [];
+  aiExplanation.value = "";
+}
+
+function diffLineClass(line) {
+  if (line.type === "add") return "diff-add";
+  if (line.type === "remove") return "diff-remove";
+  return "";
+}
+
+function diffMarker(line) {
+  if (line.type === "add") return "+";
+  if (line.type === "remove") return "-";
+  return " ";
+}
+
+async function fetchAiFix(data) {
+  try {
+    const fileContent =
+      sourceFile.value?.fileContent || "";
+    const filePath =
+      sourceFile.value?.filePath || "";
+    const res = await fetch("/api/ai-fix", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        fileContent,
+        filePath,
+        message: data.message,
+        checkerName:
+          report.value?.checkerId || "",
+        line:
+          report.value?.line?.toNumber() || 0
+      })
+    });
+    const json = await res.json();
+    const parsed = parseAiDiff(json.result);
+    aiDiffLines.value = mergeWithSource(
+      sourceFile.value?.fileContent || "", parsed
+    );
+    aiExplanation.value = parsed.explanation;
+    aiFixResult.value = parsed.raw || "";
+    aiFixState.value = "ready";
+  } catch (e) {
+    aiDiffLines.value = [];
+    aiExplanation.value = "";
+    aiFixResult.value =
+      "Error: " + (e.message || e);
+    aiFixState.value = "ready";
+  }
+}
 </script>
 
 <style lang="scss">
+.report-splitpanes {
+  min-height: 0;
+  height: 100%;
+
+  &.no-split .splitpanes__splitter {
+    display: none;
+  }
+}
 #editor {
   width: 100%;
   height: 100%;
@@ -1082,5 +1293,62 @@ function truncate(text, length) {
 .blame-gutter {
   width: 400px;
   background-color: #f7f7f7;
+}
+
+.ai-fix-panel {
+  border-color: #d8dbe0;
+}
+
+.ai-fix-result {
+  font-family: monospace;
+  line-height: 1.6;
+}
+
+.ai-diff-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.5;
+
+  .diff-ln {
+    width: 1px;
+    min-width: 32px;
+    padding: 0 8px;
+    text-align: right;
+    color: #999;
+    user-select: none;
+    white-space: nowrap;
+    background-color: #f7f7f7;
+    border-right: 1px solid #e8e8e8;
+  }
+
+  .diff-marker {
+    width: 1px;
+    padding: 0 4px;
+    user-select: none;
+    color: #999;
+  }
+
+  .line-code {
+    padding: 0 12px;
+    white-space: pre;
+  }
+}
+
+.diff-add {
+  background-color: #e6ffec;
+  .diff-ln, .diff-marker { background-color: #ccffd8; color: #1a7f37; }
+  td:first-child { border-left: 3px solid #2da44e; }
+}
+
+.diff-remove {
+  background-color: #ffeef0;
+  .diff-ln, .diff-marker { background-color: #ffd7d5; color: #cf222e; }
+  td:first-child { border-left: 3px solid #cf222e; }
+}
+
+.ai-explanation-panels {
+  border-bottom: 1px solid #d8dbe0;
 }
 </style>

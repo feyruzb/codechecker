@@ -1,63 +1,78 @@
 <template>
-  <v-chip
-    size="small"
-    variant="flat"
-    class="report-step-msg"
-    :color="color"
-    :step-id="id"
-    :type="type"
-    :style="{ 'margin-left': marginLeft, color: textColor }"
-    :title="value"
-    rounded="xs"
-  >
-    <div class="d-flex align-center ga-2">
-      <report-step-enum-icon
-        class="report-step-enum mr-1"
-        :type="type"
-        :index="index"
-      />
+  <div class="report-step-wrapper" :style="{ 'margin-left': marginLeft }">
+    <v-chip
+      size="small"
+      variant="flat"
+      class="report-step-msg"
+      :color="color"
+      :step-id="id"
+      :type="type"
+      :style="{ color: textColor }"
+      :title="value"
+      rounded="xs"
+    >
+      <div class="d-flex align-center ga-2">
+        <report-step-enum-icon
+          class="report-step-enum mr-1"
+          :type="type"
+          :index="index"
+        />
 
-      <v-btn
-        v-if="prevStep"
-        variant="text"
-        icon="mdi-chevron-left"
-        size="small"
-        density="compact"
-        @click="showPrevReport"
-      />
+        <v-btn
+          v-if="prevStep"
+          variant="text"
+          icon="mdi-chevron-left"
+          size="small"
+          density="compact"
+          @click="showPrevReport"
+        />
 
-      <div>
-        <div>{{ value }}</div>
-        <div v-if="!hideDocUrl && type === 'error'">
-          <p v-if="docUrl" class="mb-0 text-caption">
-            For more information see the
-            <a
-              class="show-documentation-btn text-primary"
-              @click="showDocumentation"
+        <div>
+          <div>{{ value }}</div>
+          <div v-if="!hideDocUrl && type === 'error'">
+            <p v-if="docUrl" class="mb-0 text-caption">
+              For more information see the
+              <a
+                class="show-documentation-btn text-primary"
+                @click="showDocumentation"
+              >
+                checker documentation
+              </a>.
+            </p>
+            <p
+              v-else
+              class="no-documentation-msg-text mb-0 text-caption text-grey"
             >
-              checker documentation
-            </a>.
-          </p>
-          <p
-            v-else
-            class="no-documentation-msg-text mb-0 text-caption text-grey"
-          >
-            No documentation for checker.
-          </p>
+              No documentation for checker.
+            </p>
+          </div>
         </div>
-      </div>
 
-      <v-btn
-        v-if="nextStep"
-        right
-        variant="text"
-        icon="mdi-chevron-right"
-        size="small"
-        density="compact"
-        @click="showNextReport"
-      />
-    </div>
-  </v-chip>
+        <v-btn
+          v-if="nextStep"
+          right
+          variant="text"
+          icon="mdi-chevron-right"
+          size="small"
+          density="compact"
+          @click="showNextReport"
+        />
+      </div>
+    </v-chip>
+
+    <v-btn
+      v-if="type === 'error'"
+      class="ai-fix-btn"
+      size="x-small"
+      icon
+      color="primary"
+      variant="flat"
+      title="Get AI fix suggestion"
+      @click.stop="requestAiFix"
+    >
+      <span style="font-size:12px">✨</span>
+    </v-btn>
+  </div>
 </template>
 
 <script setup>
@@ -74,7 +89,8 @@ const props = defineProps({
   prevStep: { type: Object, default: null },
   nextStep: { type: Object, default: null },
   docUrl: { type: String, default: null },
-  hideDocUrl: { type: Boolean, default: false }
+  hideDocUrl: { type: Boolean, default: false },
+  report: { type: Object, default: null }
 });
 
 const color = computed(() => {
@@ -106,6 +122,14 @@ const textColor = computed(() => {
     return "#00546f";
   }
 });
+
+function requestAiFix() {
+  if (props.bus)
+    props.bus.emit("requestAiFix", {
+      message: props.value,
+      report: props.report
+    });
+}
 
 function showPrevReport() {
   if (props.prevStep && props.bus)
@@ -149,6 +173,20 @@ function showDocumentation() {
   .no-documentation-msg-text {
     color: grey
   }
+}
+
+.report-step-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.ai-fix-btn {
+  position: absolute !important;
+  top: -8px;
+  right: -8px;
+  width: 24px !important;
+  height: 24px !important;
+  z-index: 1;
 }
 
 .current {
